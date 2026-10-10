@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+*/node_modules/
+bun.lockb
+
+# Environment variables (NEVER commit secrets!)
+.env
+*.env
+server/.env
+!.env.example
+!server/.env.example
+
+# Build outputs
+dist/
+client/dist/
+
+# Agent and IDE files
+.agents/
+.vscode/
+.idea/
+*.log
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+test-results/
+playwright-report/
