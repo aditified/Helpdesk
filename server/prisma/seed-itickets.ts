@@ -5,7 +5,48 @@ import { PrismaClient } from "../src/generated/prisma/client";
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
-const seedITickets = [
+interface SeedITicketMessage {
+  id: string;
+  senderType: string;
+  senderName: string;
+  senderUsername?: string;
+  senderAvatar?: string;
+  text: string;
+  timestamp: Date;
+  isAiGenerated?: boolean;
+  aiConfidence?: number;
+}
+
+interface SeedITicket {
+  id: string;
+  channel: string;
+  username: string;
+  displayName: string;
+  subject?: string;
+  avatar: string;
+  bio?: string;
+  followerCount?: number;
+  isVerified?: boolean;
+  connectedSince?: string;
+  profileUrl?: string;
+  category: string;
+  priority: string;
+  status: string;
+  aiStatus: string;
+  aiConfidence?: number;
+  aiSummary?: string;
+  suggestedReply?: string;
+  sentiment?: string;
+  unread: boolean;
+  escalationReason?: string;
+  lastMessage: string;
+  lastMessageAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+  messages: SeedITicketMessage[];
+}
+
+const seedITickets: SeedITicket[] = [
   {
     id: "ig-101",
     channel: "instagram",
