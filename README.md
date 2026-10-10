@@ -2,132 +2,210 @@
 
 > This project is built as part of my [Claude Code](https://codewithmosh.com/p/claude-code) course, showing how to build and ship a production-ready full-stack app with AI-assisted development.
 
-An AI-powered ticket management system that automatically classifies, responds to, and routes support tickets.
+An AI-powered omnichannel ticket management system that automatically classifies, responds to, and routes support tickets across **Email** and **Instagram Direct**.
+
+---
 
 ## Features
 
-- Receive support emails and create tickets via SendGrid inbound parse
-- AI-powered ticket classification (General Question, Technical Question, Refund Request)
-- AI-suggested replies and summaries
-- Ticket list with filtering and sorting
-- Ticket detail view with reply thread
-- User management (admin only)
-- Dashboard with stats
+### 📧 Email Ticketing
+- **Inbound Processing**: Ingest incoming support emails via SendGrid Inbound Parse or IMAP email listener (`imapflow` / `mailparser`).
+- **Thread Management**: Full email conversation threads with bidirectional agent and customer replies.
+- **Outbound Notifications**: Automated and agent-composed replies dispatched via SMTP (`nodemailer`) and SendGrid.
+
+### 📸 Instagram Direct "I-Tickets" (Omnichannel Support)
+- **Instagram Graph API Integration**: Ingest Direct Messages (DMs) from customers in real time.
+- **Customer Social Insights**: View Instagram handles, profile avatars, follower counts, bio, and verification badges right in the conversation sidebar.
+- **Bi-Directional Messaging**: Agents can draft and dispatch replies directly to the customer's Instagram inbox from the helpdesk.
+- **In-Browser DM Simulator**: Test incoming Instagram conversations with custom scenarios without needing an active Meta webhook setup.
+- **Built-in Setup Guide**: Interactive modal providing step-by-step Meta Developer App configuration instructions.
+
+### 🤖 AI Capabilities (Google Gemini via Vercel AI SDK)
+- **Automatic Classification**: Classify incoming tickets into categories (*General Question*, *Technical Question*, *Refund Request*, *Admission*, *Complaint*, etc.).
+- **Smart Summaries & Suggested Replies**: AI drafts context-aware responses incorporating knowledge base articles.
+- **Confidence Scoring & Sentiment Analysis**: Track ticket sentiment (*positive*, *neutral*, *frustrated*) and model confidence (0–100%).
+- **Autonomous Resolution & Escalation**:
+  - Auto-resolves routine queries when confidence meets threshold.
+  - Automatically flags and escalates complex queries (e.g., high refund requests, system bugs) with documented escalation reasons.
+- **AI Status Tracking**: Real-time lifecycle badges (`ai_suggested`, `ai_resolved`, `escalated`, `human_replied`, `awaiting_reply`).
+
+### ⚡ Real-Time Live Sync (SSE)
+- **Server-Sent Events (SSE)**: Instant browser updates for new tickets, incoming customer replies, and status transitions without page refreshes.
+
+### 👥 User & Ticket Management
+- **Role-Based Access Control**:
+  - **Admin**: Full access, user management, omnichannel I-Tickets, role assignment.
+  - **Agent**: Ticket queue, reply drafting, assignment, and status updates.
+- **Filtering & Search**: Filter by status, priority, channel, sentiment, category, and assigned agent.
+- **Analytics Dashboard**: Aggregated overview of open tickets, AI resolution rates, sentiment breakdown, and ticket volume.
+
+---
 
 ## Tech Stack
 
-- **Frontend**: React, TypeScript, Vite, shadcn/ui, TanStack Query
-- **Backend**: Express 5, TypeScript, Bun
-- **Database**: PostgreSQL, Prisma ORM
-- **AI**: Gemini via Vercel AI SDK
-- **Auth**: Better Auth (email/password, database sessions)
+- **Frontend**: React 19, TypeScript, Vite, Tailwind CSS v4, shadcn/ui, Radix UI, TanStack Query, Lucide Icons
+- **Backend**: Express 5, TypeScript, Bun runtime
+- **Database & ORM**: PostgreSQL, Prisma ORM (with `@prisma/adapter-pg`)
+- **AI**: Google Gemini (via Vercel AI SDK)
+- **Authentication**: Better Auth (session-based authentication with RBAC)
+- **Live Updates**: Server-Sent Events (SSE)
 - **Job Queue**: pg-boss
-- **Error Tracking**: Sentry
-- **Email**: SendGrid (inbound + outbound)
+- **Email Services**: SendGrid (Inbound Webhooks), IMAP Listener (`imapflow`), SMTP (`nodemailer`)
+- **Social Messaging**: Instagram Graph API
+- **Monitoring**: Sentry (Frontend & Backend error tracking)
+- **Testing**: Playwright (E2E), Vitest & Testing Library (Unit/Component)
+
+---
 
 ## Project Structure
 
+```text
+helpdesk/
+├── client/                     # React frontend (Vite)
+│   ├── src/
+│   │   ├── components/         # Shared UI & domain components
+│   │   │   ├── iticket/        # Instagram I-Ticket conversation & simulator UI
+│   │   │   └── ui/             # shadcn/ui component library
+│   │   ├── lib/                # Auth client, SSE hooks, theme, API services
+│   │   ├── pages/              # Dashboard, Tickets, I-Tickets, Users, Login
+│   │   └── types/              # Frontend TypeScript definitions
+│   └── vite.config.ts
+├── server/                     # Express backend (Bun)
+│   ├── prisma/                 # Prisma schema, migrations, and seed scripts
+│   │   ├── schema.prisma       # Database schema (Tickets, ITickets, Users, etc.)
+│   │   ├── seed.ts             # Admin & AI agent seed script
+│   │   ├── seed-tickets.ts     # Sample email tickets seed
+│   │   ├── seed-replies.ts     # Sample email replies seed
+│   │   └── seed-itickets.ts    # Realistic Instagram I-Tickets seed
+│   ├── src/
+│   │   ├── lib/                # Gemini AI, Instagram client, IMAP/SMTP, SSE, Sentry
+│   │   ├── middleware/         # Auth, Admin guard, Webhook signature validation
+│   │   └── routes/             # REST endpoints (tickets, itickets, users, webhooks, events)
+│   └── package.json
+├── core/                       # Shared contracts (Zod schemas, constants, types)
+├── e2e/                        # Playwright end-to-end test suite
+└── package.json                # Workspace root
 ```
-client/   - React frontend (Vite)
-server/   - Express backend
-core/     - Shared code (Zod schemas, types, constants)
-e2e/      - Playwright E2E tests
-```
+
+---
 
 ## Prerequisites
 
-- [Bun](https://bun.sh) (runtime and package manager)
-- PostgreSQL
+- [Bun](https://bun.sh) (v1.0+ recommended runtime & package manager)
+- PostgreSQL (v14+)
+- Google Gemini API key (for AI features)
+- *(Optional)* Meta / Instagram App credentials (for live Instagram DMs)
+- *(Optional)* SMTP / IMAP credentials (for live email processing)
+
+---
 
 ## Getting Started
 
-1. **Install dependencies**
+### 1. Install Dependencies
 
-   ```bash
-   bun install
-   ```
+```bash
+bun install
+```
 
-2. **Set up environment variables**
+### 2. Configure Environment Variables
 
-   ```bash
-   cp server/.env.example server/.env
-   cp client/.env.example client/.env
-   ```
+```bash
+cp server/.env.example server/.env
+cp client/.env.example client/.env
+```
 
-   Edit `server/.env` and fill in the required values. At minimum:
-   - `DATABASE_URL` - PostgreSQL connection string
-   - `BETTER_AUTH_SECRET` - generate with `openssl rand -base64 32`
-   - `GEMINI_API_KEY` - for AI features
+Edit `server/.env` with your local settings. Minimum required for local development:
 
-3. **Set up the database**
+```env
+DATABASE_URL="postgresql://user:password@localhost:5432/helpdesk?sslmode=disable"
+BETTER_AUTH_SECRET="your-32-character-secret-key-here"
+BETTER_AUTH_URL="http://localhost:3000"
+TRUSTED_ORIGINS="http://localhost:5173"
+GOOGLE_GENERATIVE_AI_API_KEY="your-gemini-api-key"
+SEED_ADMIN_EMAIL="admin@helpdesk.com"
+SEED_ADMIN_PASSWORD="YourSecurePassword123!"
+```
 
-   ```bash
-   cd server
-   bunx prisma migrate dev
-   bunx prisma db seed
-   ```
+### 3. Initialize & Seed Database
 
-4. **Start the dev servers**
+```bash
+cd server
 
-   ```bash
-   # Terminal 1 - backend
-   cd server && bun run dev
+# Run migrations
+bunx prisma migrate dev
 
-   # Terminal 2 - frontend
-   cd client && bun run dev
-   ```
+# Seed Admin & AI agent accounts
+bunx prisma db seed
 
-   The client runs on `http://localhost:5173` and proxies API requests to the server on port 3000.
+# (Optional) Seed demo email tickets and Instagram I-Tickets
+bun run prisma/seed-tickets.ts
+bun run prisma/seed-replies.ts
+bun run prisma/seed-itickets.ts
+```
+
+### 4. Run Development Servers
+
+Run the backend and frontend in separate terminals:
+
+```bash
+# Terminal 1 — Backend (Port 3000)
+cd server && bun run dev
+
+# Terminal 2 — Frontend (Port 5173)
+cd client && bun run dev
+```
+
+Navigate to `http://localhost:5173` and log in with your seeded admin credentials (`admin@helpdesk.com` / `YourSecurePassword123!`).
+
+---
 
 ## Testing
 
 ```bash
-# Component tests
+# Run client unit & component tests (Vitest)
 cd client && bun run test
 
-# E2E tests (requires both servers running)
+# Run end-to-end tests (Playwright - requires dev servers running)
 bun run test:e2e
+
+# Run E2E tests with UI mode
+bun run test:e2e:ui
 ```
 
-## Deployment (Railway)
+---
 
-The app is configured for single-service deployment on Railway. The Express server serves the built React client as static files in production.
+## Environment Variables Reference
 
-1. **Build the Docker image**
+| Variable | Description | Required |
+|----------|-------------|:--------:|
+| `DATABASE_URL` | PostgreSQL connection string | Yes |
+| `BETTER_AUTH_SECRET` | 32+ character secret for session signing | Yes |
+| `BETTER_AUTH_URL` | Base backend server URL | Yes |
+| `TRUSTED_ORIGINS` | Client application origin allowed for CORS / auth | Yes |
+| `GOOGLE_GENERATIVE_AI_API_KEY` | Gemini API key for ticket classification & replies | Yes |
+| `SEED_ADMIN_EMAIL` | Default admin email generated during seeding | Yes |
+| `SEED_ADMIN_PASSWORD` | Default admin password generated during seeding | Yes |
+| `WEBHOOK_SECRET` | Secret token to authenticate incoming email webhooks | Optional |
+| `INSTAGRAM_VERIFY_TOKEN` | Webhook verification token for Meta app | Optional |
+| `INSTAGRAM_PAGE_ACCESS_TOKEN`| Meta Page access token with DM permissions | Optional |
+| `INSTAGRAM_PAGE_ID` | Meta Page / Instagram Business account ID | Optional |
+| `INSTAGRAM_APP_SECRET` | Meta App Secret for signature verification | Optional |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | SMTP configuration for outbound replies | Optional |
+| `IMAP_HOST` / `IMAP_PORT` / `IMAP_USER` / `IMAP_PASS` | IMAP configuration for incoming email listener | Optional |
+| `SENTRY_DSN` / `SENTRY_ENVIRONMENT` | Sentry error tracking credentials | Optional |
 
-   ```bash
-   docker build -t helpdesk .
-   ```
+---
 
-2. **Run locally with Docker**
+## Deployment (Railway / Docker)
 
-   ```bash
-   docker run -p 3000:3000 --env-file server/.env -e NODE_ENV=production helpdesk
-   ```
+The application is structured for unified or containerized deployment:
 
-3. **Deploy to Railway**
+```bash
+# Build production Docker image
+docker build -t helpdesk .
 
-   - Create a new project and link this repo
-   - Add a PostgreSQL database
-   - Set the required environment variables (see `server/.env.example`)
-   - After the first deploy, seed the database:
-     ```bash
-     railway run -- bun run --cwd server prisma db seed
-     ```
+# Run container locally
+docker run -p 3000:3000 --env-file server/.env -e NODE_ENV=production helpdesk
+```
 
-### Required Environment Variables (Production)
-
-| Variable | Description |
-|----------|-------------|
-| `DATABASE_URL` | PostgreSQL connection string (auto-provided by Railway) |
-| `BETTER_AUTH_SECRET` | Auth secret key |
-| `BETTER_AUTH_URL` | App URL (e.g. `https://yourapp.up.railway.app`) |
-| `TRUSTED_ORIGINS` | Same as `BETTER_AUTH_URL` |
-| `WEBHOOK_SECRET` | For inbound email webhook verification |
-| `GEMINI_API_KEY` | Gemini key for AI features |
-| `SENDGRID_API_KEY` | SendGrid API key for outbound email |
-| `SENDGRID_FROM_EMAIL` | Verified sender email address |
-| `SEED_ADMIN_EMAIL` | Initial admin user email |
-| `SEED_ADMIN_PASSWORD` | Initial admin user password |
-
-Optional: `SENTRY_DSN`, `SENTRY_ENVIRONMENT`
+In production, the Express backend serves the pre-built React client bundle from `client/dist`.
