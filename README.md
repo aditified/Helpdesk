@@ -2,6 +2,10 @@
 
 An AI-powered omnichannel ticket management system that automatically classifies, responds to, and routes support tickets across **Email** and **Instagram Direct**.
 
+**Live demo:** https://helpdesk-u64v.onrender.com
+
+> The demo runs on Render's free tier, so the first request after a period of inactivity can take 30–60 seconds while the service wakes up. See [Known Limitations](#known-limitations) for what does and doesn't work on the live demo.
+
 ---
 
 ## Features
@@ -15,7 +19,7 @@ An AI-powered omnichannel ticket management system that automatically classifies
 - **Instagram Graph API Integration**: Ingest Direct Messages (DMs) from customers in real time.
 - **Customer Social Insights**: View Instagram handles, profile avatars, follower counts, bio, and verification badges right in the conversation sidebar.
 - **Bi-Directional Messaging**: Agents can draft and dispatch replies directly to the customer's Instagram inbox from the helpdesk.
-- **In-Browser DM Simulator**: Test incoming Instagram conversations with custom scenarios without needing an active Meta webhook setup.
+- **In-Browser DM Simulator**: Test incoming Instagram conversations with custom scenarios using **Simulate Inbound DM**, without needing an active Meta webhook setup.
 - **Built-in Setup Guide**: Interactive modal providing step-by-step Meta Developer App configuration instructions.
 
 ### 🤖 AI Capabilities (Google Gemini via Vercel AI SDK)
@@ -39,6 +43,19 @@ An AI-powered omnichannel ticket management system that automatically classifies
 
 ---
 
+## Known Limitations
+
+The live demo at https://helpdesk-u64v.onrender.com is hosted on Render's free tier, which causes the following:
+
+- **Outbound email replies are not delivered.** Since September 2025, Render's free web services block outbound traffic on SMTP ports 25, 465 and 587. Tickets are still created from incoming emails (IMAP uses port 993, which is not blocked) and AI replies are generated and saved to the ticket, but the reply email itself is never sent to the customer's inbox. Fixes: upgrade the web service to a paid instance (ports 465 and 587 become available), or send through an HTTPS email API (Brevo, SendGrid, Resend) instead of SMTP.
+- **Instagram Direct is not live-connected.** The Meta app is in development mode, so real customer DMs are not delivered to the webhook. The Instagram flow can be tested with **Simulate Inbound DM** inside the I-Tickets page, which creates a conversation exactly as an incoming DM would.
+- **The service sleeps when idle.** The IMAP listener, Instagram poller and job queue pause while the free instance is asleep, so emails can be picked up late.
+- **The free Render Postgres database expires 30 days after creation.**
+
+All of these are hosting-tier limits, not application bugs. Locally, with SMTP access and a live Meta app, the full email and Instagram flows work.
+
+---
+
 ## Tech Stack
 
 - **Frontend**: React 19, TypeScript, Vite, Tailwind CSS v4, shadcn/ui, Radix UI, TanStack Query, Lucide Icons
@@ -52,6 +69,7 @@ An AI-powered omnichannel ticket management system that automatically classifies
 - **Social Messaging**: Instagram Graph API
 - **Monitoring**: Sentry (Frontend & Backend error tracking)
 - **Testing**: Playwright (E2E), Vitest & Testing Library (Unit/Component)
+- **Hosting**: Render (web service + managed PostgreSQL)
 
 ---
 
@@ -109,7 +127,6 @@ bun install
 
 ```bash
 cp server/.env.example server/.env
-cp client/.env.example client/.env
 ```
 
 Edit `server/.env` with your local settings. Minimum required for local development:
@@ -153,7 +170,7 @@ cd server && bun run dev
 cd client && bun run dev
 ```
 
-Navigate to `http://localhost:5173` and log in with your seeded admin credentials (`admin@helpdesk.com` / `YourSecurePassword123!`).
+Navigate to `http://localhost:5173` and log in with the admin credentials you set in `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD`.
 
 ---
 
@@ -178,8 +195,9 @@ bun run test:e2e:ui
 |----------|-------------|:--------:|
 | `DATABASE_URL` | PostgreSQL connection string | Yes |
 | `BETTER_AUTH_SECRET` | 32+ character secret for session signing | Yes |
-| `BETTER_AUTH_URL` | Base backend server URL | Yes |
-| `TRUSTED_ORIGINS` | Client application origin allowed for CORS / auth | Yes |
+| `BETTER_AUTH_URL` | Public base URL of the app (e.g. `https://helpdesk-u64v.onrender.com`) | Yes |
+| `TRUSTED_ORIGINS` | App origin allowed for CORS / auth (same as `BETTER_AUTH_URL` in production) | Yes |
+| `NODE_ENV` | Set to `production` to serve the built React client from the Express server | Production |
 | `GOOGLE_GENERATIVE_AI_API_KEY` | Gemini API key for ticket classification & replies | Yes |
 | `SEED_ADMIN_EMAIL` | Default admin email generated during seeding | Yes |
 | `SEED_ADMIN_PASSWORD` | Default admin password generated during seeding | Yes |
@@ -194,16 +212,53 @@ bun run test:e2e:ui
 
 ---
 
-## Deployment (Railway / Docker)
+## Deployment (Render)
 
-The application is structured for unified or containerized deployment:
+The app deploys as a single Render web service plus a Render PostgreSQL database. In production, the Express backend serves the pre-built React client from `client/dist`, so no separate frontend deployment is needed.
 
-```bash
-# Build production Docker image
-docker build -t helpdesk .
+### 1. Create the database
 
-# Run container locally
-docker run -p 3000:3000 --env-file server/.env -e NODE_ENV=production helpdesk
+In Render, create a **PostgreSQL** instance in the same region as your web service and copy its **Internal Database URL**.
+
+### 2. Create the web service
+
+Create a **Web Service** from the GitHub repo and set:
+
+| Setting | Value |
+|---------|-------|
+| Language / Runtime | `Node` (Bun is available on Render's native runtime) |
+| Root Directory | *(empty — repository root)* |
+| Build Command | `bun install && bun run build` |
+| Start Command | `cd server && bunx prisma migrate deploy && bun run start` |
+| Health Check Path | `/api/health` |
+
+The build command builds the React client and generates the Prisma client. The start command applies pending migrations on every boot.
+
+### 3. Set environment variables
+
+Add the variables from the reference table above, with these production values:
+
+- `DATABASE_URL` — the Internal Database URL from step 1
+- `NODE_ENV` — `production`
+- `BETTER_AUTH_URL` and `TRUSTED_ORIGINS` — your service URL, with no trailing slash
+
+### 4. Seed the admin user
+
+Render's free plan has no shell, so run the seed locally against the **External Database URL** (PowerShell shown):
+
+```powershell
+cd server
+$env:DATABASE_URL="<External Database URL>?sslmode=require"
+bunx prisma db seed
+Remove-Item Env:DATABASE_URL
 ```
 
-In production, the Express backend serves the pre-built React client bundle from `client/dist`.
+On macOS/Linux: `DATABASE_URL="<External Database URL>?sslmode=require" bunx prisma db seed`
+
+### 5. Instagram webhook (optional)
+
+In the Meta Developer dashboard, set the webhook callback URL to `https://<your-app>.onrender.com/api/webhooks/instagram` and the verify token to the value of `INSTAGRAM_VERIFY_TOKEN`. Real DMs from ordinary users only arrive once the Meta app is published; until then, use **Simulate Inbound DM**.
+
+### Outbound email on Render
+
+Outbound SMTP is blocked on Render's free web services (see [Known Limitations](#known-limitations)). To send reply emails in production, use a paid Render instance or an HTTPS email provider.
