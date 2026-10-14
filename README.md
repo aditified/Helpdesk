@@ -7,6 +7,15 @@ An AI-powered omnichannel ticket management system that automatically classifies
 > The demo runs on Render's free tier, so the first request after a period of inactivity can take 30–60 seconds while the service wakes up. See [Known Limitations](#known-limitations) for what does and doesn't work on the live demo.
 
 ---
+Demo Login
+
+When you open the site you will be asked to log in. Use these credentials to access the dashboard:
+
+Field	Value
+Email	admin@example.com
+Password	password123
+
+These are demo-only credentials for the live deployment. Please don't change the password or delete users.
 
 ## Features
 
